@@ -59,7 +59,7 @@ jobs:
 
           python .github/scripts/ai_review.py \
             --plan tfplan.json \
-            --workspace dev > ai-review.md
+            --workspace dev 
 
 
       - name: Comment AI Review on PR
