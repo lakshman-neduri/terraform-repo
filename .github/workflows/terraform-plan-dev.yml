@@ -59,7 +59,27 @@ jobs:
 
           python .github/scripts/ai_review.py \
             --plan tfplan.json \
-            --workspace dev 
+            --workspace dev > ai-review.md
+
+
+      - name: Comment AI Review on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const review = fs.readFileSync('ai-review.md', 'utf8');
+
+            const body = `## 🤖 AI Terraform Review
+
+            ${review}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
 
       # - name: Generate Terraform Summary
       #   run: |
