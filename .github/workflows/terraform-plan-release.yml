@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - release
+    types:
+      - opened
+      - synchronize
 
 permissions:
   contents: read
@@ -12,14 +15,17 @@ permissions:
 
 jobs:
   terraform-plan:
+    name: Terraform Plan - ${{ matrix.workspace }}
+    runs-on: ubuntu-latest
+
     strategy:
       matrix:
         workspace:
           - qa
           - prod
-    name: Terraform Plan - ${{ matrix.workspace }}
+
     environment: ${{ matrix.workspace }}
-    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,6 +34,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.15.1"
+          terraform_wrapper: false
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -39,16 +46,121 @@ jobs:
         run: terraform init -input=false
 
       - name: Select Workspace
-        run: terraform workspace select -or-create ${{ matrix.workspace }}
+        run: terraform workspace select ${{ matrix.workspace }}
 
       - name: Verify Workspace
         run: terraform workspace show
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan-${{ matrix.workspace }}.binary
+        run: terraform plan -input=false -out=tfplan-${{ matrix.workspace }}.binary
 
-      - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v4
+      - name: Convert Terraform Plan to JSON
+        run: terraform show -json tfplan-${{ matrix.workspace }}.binary > tfplan-${{ matrix.workspace }}.json
+
+      - name: Generate Terraform Summary
+        run: |
+          WORKSPACE="${{ matrix.workspace }}"
+          PLAN_JSON="tfplan-${WORKSPACE}.json"
+
+          echo "## Terraform Plan - ${WORKSPACE^^}" > terraform-summary.md
+          echo "" >> terraform-summary.md
+
+          echo "### Summary" >> terraform-summary.md
+          echo "" >> terraform-summary.md
+
+          CREATED=$(jq '[.resource_changes[]? | select(.change.actions == ["create"])] | length' "$PLAN_JSON")
+
+          UPDATED=$(jq '[.resource_changes[]? | select(.change.actions == ["update"])] | length' "$PLAN_JSON")
+
+          DESTROYED=$(jq '[.resource_changes[]? | select(.change.actions == ["delete"])] | length' "$PLAN_JSON")
+
+          REPLACED=$(jq '[.resource_changes[]? | select(.change.actions == ["delete","create"] or .change.actions == ["create","delete"])] | length' "$PLAN_JSON")
+
+          echo "| Action | Count |" >> terraform-summary.md
+          echo "|--------|------:|" >> terraform-summary.md
+          echo "| 🟢 Create | $CREATED |" >> terraform-summary.md
+          echo "| 🟡 Change | $UPDATED |" >> terraform-summary.md
+          echo "| 🔵 Replace | $REPLACED |" >> terraform-summary.md
+          echo "| 🔴 Destroy | $DESTROYED |" >> terraform-summary.md
+
+          echo "" >> terraform-summary.md
+          echo "### Resources" >> terraform-summary.md
+          echo "" >> terraform-summary.md
+
+          echo "#### 🟢 Create" >> terraform-summary.md
+
+          jq -r '
+            .resource_changes[]?
+            | select(.change.actions == ["create"])
+            | "- `" + .address + "`"
+          ' "$PLAN_JSON" >> terraform-summary.md
+
+          echo "" >> terraform-summary.md
+          echo "#### 🟡 Change" >> terraform-summary.md
+
+          jq -r '
+            .resource_changes[]?
+            | select(.change.actions == ["update"])
+            | "- `" + .address + "`"
+          ' "$PLAN_JSON" >> terraform-summary.md
+
+          echo "" >> terraform-summary.md
+          echo "#### 🔵 Replace" >> terraform-summary.md
+
+          jq -r '
+            .resource_changes[]?
+            | select(.change.actions == ["delete","create"] or .change.actions == ["create","delete"])
+            | "- `" + .address + "`"
+          ' "$PLAN_JSON" >> terraform-summary.md
+
+          echo "" >> terraform-summary.md
+          echo "#### 🔴 Destroy" >> terraform-summary.md
+
+          jq -r '
+            .resource_changes[]?
+            | select(.change.actions == ["delete"])
+            | "- `" + .address + "`"
+          ' "$PLAN_JSON" >> terraform-summary.md
+
+      - name: Comment Terraform Plan on PR
+        uses: actions/github-script@v7
         with:
-          name: tfplan-${{ matrix.workspace }}
-          path: tfplan-${{ matrix.workspace }}.binary
+          script: |
+            const fs = require('fs');
+
+            const workspace = '${{ matrix.workspace }}';
+            const summary = fs.readFileSync('terraform-summary.md', 'utf8');
+
+            const marker = `<!-- terraform-plan-${workspace} -->`;
+
+            const body = `${marker}
+            ${summary}`;
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number
+              }
+            );
+
+            const existingComment = comments.find(comment =>
+              comment.body && comment.body.includes(marker)
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }

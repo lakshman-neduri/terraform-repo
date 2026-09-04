@@ -20,6 +20,7 @@ jobs:
     name: Terraform Apply - ${{ inputs.workspace }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.workspace }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,6 +29,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.15.1"
+          terraform_wrapper: false
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -45,7 +47,7 @@ jobs:
         run: terraform workspace show
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan.binary
+        run: terraform plan -input=false -out=tfplan.binary
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan.binary
+        run: terraform apply -input=false tfplan.binary
