@@ -1,22 +1,38 @@
 import argparse
 import json
-import os
 
-from openai import OpenAI
-
-
-def load_plan(path):
-    with open(path, "r") as file:
-        return json.load(file)
+from google import genai
 
 
-def extract_changes(plan):
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--plan",
+        required=True,
+        help="Path to Terraform plan JSON"
+    )
+
+    parser.add_argument(
+        "--workspace",
+        required=True,
+        help="Terraform workspace"
+    )
+
+    args = parser.parse_args()
+
+    # Read Terraform plan JSON
+    with open(args.plan, "r") as file:
+        plan = json.load(file)
+
+    # Extract resource changes
     changes = []
 
     for resource in plan.get("resource_changes", []):
         change = resource.get("change", {})
         actions = change.get("actions", [])
 
+        # Ignore resources with no changes
         if actions == ["no-op"]:
             continue
 
@@ -25,54 +41,49 @@ def extract_changes(plan):
             "type": resource.get("type"),
             "actions": actions,
             "before": change.get("before"),
-            "after": change.get("after"),
+            "after": change.get("after")
         })
 
-    return changes
-
-
-def main():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--plan", required=True)
-    parser.add_argument("--workspace", required=True)
-
-    args = parser.parse_args()
-
-    plan = load_plan(args.plan)
-    changes = extract_changes(plan)
-
     if not changes:
-        print("# Terraform AI Review\n\nNo infrastructure changes detected.")
+        print("# Terraform AI Review\n")
+        print("No infrastructure changes detected.")
         return
 
-    client = OpenAI()
-
     prompt = f"""
-You are a Terraform infrastructure reviewer.
+You are an expert DevOps engineer reviewing a Terraform plan.
 
-Terraform workspace: {args.workspace}
+Terraform workspace:
+{args.workspace}
 
-Review the following Terraform plan changes:
+Terraform resource changes:
 
 {json.dumps(changes, indent=2)}
 
-Provide a concise Markdown review.
-
-Include:
+Review these changes and provide a concise Markdown report.
 
 ## Summary
-Explain what is changing.
+
+Explain what infrastructure is changing.
 
 ## Risk
-Classify the overall risk as LOW, MEDIUM, HIGH, or CRITICAL.
-Explain the reason.
+
+Classify the overall risk as one of:
+
+- LOW
+- MEDIUM
+- HIGH
+- CRITICAL
+
+Explain why you selected that risk.
 
 ## Important Changes
-List the significant resource changes.
+
+List the important resource changes.
 
 ## Potential Issues
-Look specifically for:
+
+Look for:
+
 - destructive changes
 - resource replacements
 - security risks
@@ -81,21 +92,27 @@ Look specifically for:
 - possible cost implications
 
 ## Recommendation
+
 Choose one:
+
 - SAFE TO PROCEED
 - REVIEW REQUIRED
 - HIGH RISK
 
 Only use information present in the Terraform plan.
-Do not invent infrastructure details.
+Do not invent information.
 """
 
-    response = client.responses.create(
-        model="gpt-5",
-        input=prompt,
+    # Create Gemini client.
+    # GEMINI_API_KEY is read automatically from the environment.
+    client = genai.Client()
+
+    response = client.models.generate_content(
+        model="gemini-3.7-flash",
+        contents=prompt
     )
 
-    print(response.output_text)
+    print(response.text)
 
 
 if __name__ == "__main__":
