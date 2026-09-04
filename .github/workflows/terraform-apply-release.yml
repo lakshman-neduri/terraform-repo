@@ -17,10 +17,10 @@ permissions:
 
 jobs:
   terraform-apply:
+    if: github.ref == 'refs/heads/release'
     name: Terraform Apply - ${{ inputs.workspace }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.workspace }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
