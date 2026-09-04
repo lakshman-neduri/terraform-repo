@@ -1,5 +1,5 @@
 terraform {
-  backend "aws" {
+  backend "s3" {
     bucket = "lakshman-terraform-state-bucket"
     key    = var.repo_name
     region = "us-east-1"

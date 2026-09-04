@@ -5,9 +5,13 @@ permissions:
   pull-requests: write
 
 on:
-    pull_request:
-        branches:
-            - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
 jobs:
     terraform-plan:
         name: Terraform Plan Dev
