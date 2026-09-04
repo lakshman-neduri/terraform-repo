@@ -1,0 +1,53 @@
+name: Terraform Apply Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: "Select Terraform workspace"
+        required: true
+        type: choice
+        options:
+          - qa
+          - prod
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply - ${{ inputs.workspace }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.workspace }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.1"
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Select Workspace
+        run: terraform workspace select -or-create ${{ inputs.workspace }}
+
+      - name: Verify Workspace
+        run: terraform workspace show
+
+      - name: Terraform Plan
+        run: terraform plan -input=false -out=tfplan.binary
+
+      - name: Terraform Apply
+        run: terraform apply -input=false tfplan.binary
