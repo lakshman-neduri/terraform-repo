@@ -25,6 +25,7 @@ jobs:
               uses: hashicorp/setup-terraform@v2
               with:
                   terraform_version: 1.15.1
+                  terraform_wrapper: false
 
             - name: Configure AWS credentials
               uses: aws-actions/configure-aws-credentials@v2
@@ -49,17 +50,8 @@ jobs:
 
 
 
-            - name: Debug Terraform Plan JSON
-              run: |
-                echo "File size:"
-                wc -c tfplan.json
-
-                echo "First 1000 characters:"
-                head -c 1000 tfplan.json
-
-                echo
-                echo "JSON validation:"
-                jq empty tfplan.json
+            - name: Validate Terraform Plan JSON
+              run: jq empty tfplan.json
 
 
             # - name: Generate Terraform Summary
