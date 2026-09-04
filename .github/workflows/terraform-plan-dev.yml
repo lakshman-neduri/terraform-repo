@@ -48,49 +48,63 @@ jobs:
               run: terraform show -json tfplan.binary > tfplan.json
 
 
-            - name: Generate Terraform Summary
+
+            - name: Debug Terraform Plan JSON
               run: |
-                echo "## Terraform Plan - DEV" > terraform-summary.md
-                echo "" >> terraform-summary.md
+                echo "File size:"
+                wc -c tfplan.json
 
-                echo "### Summary" >> terraform-summary.md
-                echo "" >> terraform-summary.md
+                echo "First 1000 characters:"
+                head -c 1000 tfplan.json
 
-                ADDED=$(jq '[.resource_changes[]? | select(.change.actions | index("create"))] | length' tfplan.json)
-                CHANGED=$(jq '[.resource_changes[]? | select(.change.actions | index("update"))] | length' tfplan.json)
-                DESTROYED=$(jq '[.resource_changes[]? | select(.change.actions | index("delete"))] | length' tfplan.json)
+                echo
+                echo "JSON validation:"
+                jq empty tfplan.json
 
-                echo "| Action | Count |" >> terraform-summary.md
-                echo "|--------|------:|" >> terraform-summary.md
-                echo "| Create | $ADDED |" >> terraform-summary.md
-                echo "| Change | $CHANGED |" >> terraform-summary.md
-                echo "| Destroy | $DESTROYED |" >> terraform-summary.md
-                echo "" >> terraform-summary.md
 
-                echo "### Resources" >> terraform-summary.md
-                echo "" >> terraform-summary.md
+            # - name: Generate Terraform Summary
+            #   run: |
+            #     echo "## Terraform Plan - DEV" > terraform-summary.md
+            #     echo "" >> terraform-summary.md
 
-                echo "#### 🟢 Create" >> terraform-summary.md
-                jq -r '
-                  .resource_changes[]?
-                  | select(.change.actions | index("create"))
-                  | "- `" + .address + "`"
-                ' tfplan.json >> terraform-summary.md
+            #     echo "### Summary" >> terraform-summary.md
+            #     echo "" >> terraform-summary.md
 
-                echo "" >> terraform-summary.md
-                echo "#### 🟡 Change" >> terraform-summary.md
-                jq -r '
-                  .resource_changes[]?
-                  | select(.change.actions | index("update"))
-                  | "- `" + .address + "`"
-                ' tfplan.json >> terraform-summary.md
+            #     ADDED=$(jq '[.resource_changes[]? | select(.change.actions | index("create"))] | length' tfplan.json)
+            #     CHANGED=$(jq '[.resource_changes[]? | select(.change.actions | index("update"))] | length' tfplan.json)
+            #     DESTROYED=$(jq '[.resource_changes[]? | select(.change.actions | index("delete"))] | length' tfplan.json)
 
-                echo "" >> terraform-summary.md
-                echo "#### 🔴 Destroy" >> terraform-summary.md
-                jq -r '
-                  .resource_changes[]?
-                  | select(.change.actions | index("delete"))
-                  | "- `" + .address + "`"
-                ' tfplan.json >> terraform-summary.md
+            #     echo "| Action | Count |" >> terraform-summary.md
+            #     echo "|--------|------:|" >> terraform-summary.md
+            #     echo "| Create | $ADDED |" >> terraform-summary.md
+            #     echo "| Change | $CHANGED |" >> terraform-summary.md
+            #     echo "| Destroy | $DESTROYED |" >> terraform-summary.md
+            #     echo "" >> terraform-summary.md
+
+            #     echo "### Resources" >> terraform-summary.md
+            #     echo "" >> terraform-summary.md
+
+            #     echo "#### 🟢 Create" >> terraform-summary.md
+            #     jq -r '
+            #       .resource_changes[]?
+            #       | select(.change.actions | index("create"))
+            #       | "- `" + .address + "`"
+            #     ' tfplan.json >> terraform-summary.md
+
+            #     echo "" >> terraform-summary.md
+            #     echo "#### 🟡 Change" >> terraform-summary.md
+            #     jq -r '
+            #       .resource_changes[]?
+            #       | select(.change.actions | index("update"))
+            #       | "- `" + .address + "`"
+            #     ' tfplan.json >> terraform-summary.md
+
+            #     echo "" >> terraform-summary.md
+            #     echo "#### 🔴 Destroy" >> terraform-summary.md
+            #     jq -r '
+            #       .resource_changes[]?
+            #       | select(.change.actions | index("delete"))
+            #       | "- `" + .address + "`"
+            #     ' tfplan.json >> terraform-summary.md
             
             
