@@ -1,0 +1,54 @@
+name: Terraform Plan Release
+
+on:
+  pull_request:
+    branches:
+      - release
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+  terraform-plan:
+    strategy:
+      matrix:
+        workspace:
+          - qa
+          - prod
+    name: Terraform Plan - ${{ matrix.workspace }}
+    environment: ${{ matrix.workspace }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.1"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Select Workspace
+        run: terraform workspace select -or-create ${{ matrix.workspace }}
+
+      - name: Verify Workspace
+        run: terraform workspace show
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan-${{ matrix.workspace }}.binary
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.workspace }}
+          path: tfplan-${{ matrix.workspace }}.binary
