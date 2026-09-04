@@ -45,8 +45,8 @@ jobs:
       - name: Terraform Init
         run: terraform init -input=false
 
-      - name: Select Workspace
-        run: terraform workspace select ${{ matrix.workspace }}
+      - name: Select Workspace or Create
+        run: terraform workspace select ${{ matrix.workspace }} || terraform workspace new ${{ matrix.workspace }}
 
       - name: Verify Workspace
         run: terraform workspace show
