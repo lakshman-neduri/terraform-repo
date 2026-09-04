@@ -55,7 +55,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python -m pip install openai
+          python -m pip install google-genai
 
           python .github/scripts/ai_review.py \
             --plan tfplan.json \
