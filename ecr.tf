@@ -5,4 +5,7 @@ resource "aws_ecr_repository" "frontend_poc" {
   image_scanning_configuration {
     scan_on_push = true
   }
+  tags = {
+    Env = terraform.workspace
+  }
 }
